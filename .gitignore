@@ -1,0 +1,6 @@
+.vscode
+vendor
+*.css
+*.jpg
+*.png
+*.webp
