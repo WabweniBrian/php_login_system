@@ -1,5 +1,11 @@
-<?php include_once __DIR__ . './../includes/Header.php'; ?>
+<?php
+session_start();
 
-<h1>Home</h1>
+if (!isset($_SESSION['username'])) {
+    header('Location: login.php');
+}
 
-<?php include_once __DIR__ . './../includes/Footer.php'; ?>
+ob_start();
+include_once __DIR__ . './../views/users/home.php';
+$output = ob_get_clean();
+include_once __DIR__ . './../views/layout/main.php';

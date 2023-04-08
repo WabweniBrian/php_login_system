@@ -1,17 +1,19 @@
 <?php
 session_start();
 
+// Connect to database
 try {
-    $pdo = new PDO('mysql:host=localhost;port=3306;dbname=login_23', 'root', ''); // connect to database
-    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION); // set error m.
+    $pdo = new PDO('mysql:host=localhost;port=3306;dbname=login_23', 'root', '');
+    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 } catch (PDOException $e) {
     echo "Connection failed: " . $e->getMessage();
 }
 
-
+// Initialize variables
 $username = $email = $password = $password_confirmation = '';
 $errors = ['username' => '', 'email' => '', 'password' => '', 'password_confirmation' => ''];
 
+// Process form data when submitted
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     // Sanitize user inputs to prevent SQL injection attacks
     $username = filter_var($_POST['username'], FILTER_SANITIZE_FULL_SPECIAL_CHARS);
@@ -19,52 +21,84 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $password = filter_var($_POST['password'], FILTER_SANITIZE_FULL_SPECIAL_CHARS);
     $password_confirmation = filter_var($_POST['password_confirmation'], FILTER_SANITIZE_FULL_SPECIAL_CHARS);
 
-    // Validate username
+    // Validate user inputs
     if (empty($username)) {
-        $errors['username'] = 'Username is required';
+        $errors['username'] = "Username is required";
     }
 
-
-    // Validate email
-    $user = $pdo->query("SELECT * FROM users WHERE email = '$email'");
     if (empty($email)) {
-        $errors['email'] = 'Email address is required';
-    } else if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        $errors['email'] = 'Invalid email address';
-    } else if ($user->rowCount() > 0) {
-        $errors['email'] = 'Email address already exists';
+        $errors['email'] = "Email is required";
     }
 
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $errors['email'] = "Invalid email format";
+    }
 
-    // Validate password
     if (empty($password)) {
-        $errors['password'] = 'Password is required';
-    } else if (strlen($password) < 4) {
-        $errors['password'] = 'Password must be at least 4 characters';
+        $errors['password'] = "Password is required";
     }
 
-    // Validate password confirmation
-    if (empty($password_confirmation)) {
-        $errors['password_confirmation'] = 'Confirmation Password is required';
-    } else if ($password_confirmation !== $password) {
-        $errors['password_confirmation'] = 'Passwords does not match';
+    if (strlen($password) < 6) {
+        $errors['password'] = "Password must be at least 6 characters";
     }
 
-    // Store hashed password
-    $hashed_password = password_hash($password, PASSWORD_DEFAULT);
+    if ($password != $password_confirmation) {
+        $errors['password_confirmation'] = "Passwords do not match";
+    }
 
+    // Check if the username or email is already taken
+    $statement = $pdo->prepare("SELECT * FROM users_table WHERE username=:username OR email=:email");
+    $statement->execute([':username' => $username, ':email' => $email]);
+    $user = $statement->fetch();
+
+    if ($user) {
+        if ($user['username'] == $username) {
+            $errors['username'] = "Username already taken";
+        }
+
+        if ($user['email'] == $email) {
+            $errors['username'] = "Email already taken";
+        }
+    }
+
+    // If there are no errors, register the user
     if (!array_filter($errors)) {
-        $statement = $pdo->prepare("INSERT INTO users (username, email, password) VALUES(?,?,?)");
-        $statement->execute([$username, $email, $hashed_password]);
+        // Hash the password before storing it in the database
+        $password_hash = password_hash($password, PASSWORD_DEFAULT);
 
+        // Generate a verification token
+        $verification_token = bin2hex(random_bytes(32));
+
+        // Insert user data into the database
+        $statement = $pdo->prepare("INSERT INTO users_table (username, email, password, verification_token) VALUES (:username, :email, :password, :verification_token)");
+        $statement->execute([':username' => $username, ':email' => $email, ':password' => $password_hash, ':verification_token' => $verification_token]);
+
+        // Send a verification email to the user
+        $to = $email;
+        $subject = 'Verify your account';
+        $message = "Please click the following link to verify your account:\n\n";
+        $message .= "http://localhost/verify.php?token=" . $verification_token;
+        $headers = 'From: webmaster@example.com' . "\r\n" .
+            'Reply-To: webmaster@example.com' . "\r\n" .
+            'X-Mailer: PHP/' . phpversion();
+
+
+        if (mail($to, $subject, $message, $headers)) {
+            $_SESSION['success'] = "You are now registered and a verification email has been sent to your email address";
+        } else {
+            $_SESSION['success'] = "There was an error sending a verification email";
+        }
+
+        // Store user data in session variables
         $_SESSION['username'] = $username;
         $_SESSION['email'] = $email;
 
-        header("Location: index.php");
+
+        // Redirect to home page
+        header('location: index.php');
+        exit();
     }
 }
-
-
 
 ?>
 

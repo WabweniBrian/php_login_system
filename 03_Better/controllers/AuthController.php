@@ -12,4 +12,8 @@ class AuthController
     public function register()
     {
     }
+
+    public function logout()
+    {
+    }
 }

@@ -1,9 +1,10 @@
 <?php
 session_start();
 
+// Connect to database
 try {
-    $pdo = new PDO('mysql:host=localhost;port=3306;dbname=login_23', 'root', ''); // connect to database
-    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION); // set error m.
+    $pdo = new PDO('mysql:host=localhost;port=3306;dbname=login_23', 'root', '');
+    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 } catch (PDOException $e) {
     echo "Connection failed: " . $e->getMessage();
 }
@@ -19,19 +20,19 @@ if (isset($_COOKIE['remember_me']) && $_COOKIE['remember_me'] == 'on') {
     $email = '';
 }
 
+// Process form data when submitted
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     // Sanitize user inputs to prevent SQL injection attacks
     $email = filter_var($_POST['email'], FILTER_SANITIZE_EMAIL);
     $password = filter_var($_POST['password'], FILTER_SANITIZE_FULL_SPECIAL_CHARS);
 
-    // Validate email
+    // Validate user inputs
     if (empty($email)) {
-        $errors['email'] = 'Email address is required';
+        $errors['email'] = "Email address is required";
     }
 
-    // Validate password
     if (empty($password)) {
-        $errors['password'] = 'Password is required';
+        $errors['password'] = "Password is required";
     }
 
     // Set remember me cookie if checked
@@ -47,21 +48,29 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $remember_me_checked = false;
     }
 
+    // If there are no errors, attempt to log in the user
     if (!array_filter($errors)) {
-        $statement = $pdo->prepare("SELECT * FROM users WHERE email= ?");
-        $statement->execute([$email]);
+        // Check if the username exists in the database
+        $statement = $pdo->prepare("SELECT * FROM users_table WHERE email=:email");
+        $statement->execute([':email' => $email]);
         $user = $statement->fetch();
 
-        if ($user && password_verify($password, $user['password'])) {
-            // Store data in session variables
-            $_SESSION['username'] = $user['username'];
-            $_SESSION['email'] = $email;
+        // Check if the password matches the hashed password stored in the database
+        if ($user &&  password_verify($password, $user['password'])) {
+            // Check if the user's account is verified
+            if ($user['is_verified'] == 1) {
+                // Log in the user by storing their username in a session variable
+                $_SESSION['email'] = $email;
+                $_SESSION['username'] = $user['username'];
 
-            // Redirect to welcome page
-            header("Location: index.php");
+                // Redirect the user to the homepage
+                header('Location: index.php');
+                exit();
+            } else {
+                $errors['credential_err'] =  "Your account has not been verified. Please check your email for a verification link.";
+            }
         } else {
-            // Display an error message if username or password is invalid
-            $errors['credential_err'] = 'Invalid username or password.';
+            $errors['credential_err'] = "Username or Password is incorect";
         }
     }
 }
