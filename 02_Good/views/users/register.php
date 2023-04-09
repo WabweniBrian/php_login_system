@@ -7,7 +7,7 @@
                     <div class="mb-3">
                         <label class="form-label">Username</label>
                         <input type="text" name="username" class="form-control" placeholder="Username.."
-                            value="<?= $username ?>">
+                            value="<?= htmlspecialchars($username) ?>">
                         <small class="form-text text-muted text-danger"><?= $errors['username'] ?></small>
                     </div>
                     <div class="mb-3">
