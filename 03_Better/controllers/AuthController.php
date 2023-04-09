@@ -51,7 +51,7 @@ class AuthController
         if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $userData['email'] = filter_var($_POST['email'], FILTER_SANITIZE_EMAIL);
             $userData['password'] = filter_var($_POST['password'], FILTER_SANITIZE_SPECIAL_CHARS);
-            $userData['remember_me'] = $_POST['remember_me'];
+            $userData['remember_me'] = $_POST['remember_me'] ?? null;
 
             $user = new User();
             $user->processData($userData);
