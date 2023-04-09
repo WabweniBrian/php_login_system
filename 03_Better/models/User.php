@@ -14,6 +14,7 @@ class User
     public ?string $remember_me = null;
     public ?array $errors = null;
 
+
     public function processData($user)
     {
         $this->username = $user['username'] ?? null;
@@ -26,51 +27,29 @@ class User
     public function validateUser(string $type)
     {
         if ($type === 'register') {
-            $this->errors = ['username' => '', 'email' => '', 'password' => '', 'password_confirmation' => ''];
+            $this->errors = UserValidator::validateRegister([
+                'username' => $this->username,
+                'email' => $this->email,
+                'password' => $this->password,
+                'password_confirmation' => $this->password_confirmation,
+            ]);
 
-            // Validate username
-            if (empty($this->username)) {
-                $this->errors['username'] = 'Username is required';
-            }
-            // Validate email
             $existingUser = Database::$db->existingUser($this);
-            if (empty($this->email)) {
-                $this->errors['email'] = 'Email address is required';
-            } else if (!filter_var($this->email, FILTER_VALIDATE_EMAIL)) {
-                $this->errors['email'] = 'Invalid email address';
-            } else if ($existingUser->rowCount() > 0) {
+            if ($existingUser->rowCount() > 0) {
                 $this->errors['email'] = 'Email address already exists';
-            }
-            // Validate password
-            if (empty($this->password)) {
-                $this->errors['password'] = 'Password is required';
-            } else if (strlen($this->password) < 4) {
-                $this->errors['password'] = 'Password must be at least 4 characters';
-            }
-
-            // Validate password confirmation
-            if (empty($this->password_confirmation)) {
-                $this->errors['password_confirmation'] = 'Confirmation Password is required';
-            } else if ($this->password_confirmation !== $this->password) {
-                $this->errors['password_confirmation'] = 'Passwords does not match';
             }
 
             // Store hashed password
             $this->hashed_password = password_hash($this->password, PASSWORD_DEFAULT);
         } else {
-            $this->errors = ['email' => '', 'password' => '', 'credential_err' => ''];
-            // Validate email
-            if (empty($this->email)) {
-                $this->errors['email'] = 'Email address is required';
-            }
-
-            // Validate password
-            if (empty($this->password)) {
-                $this->errors['password'] = 'Password is required';
-            }
+            $this->errors = UserValidator::validateLogin([
+                'email' => $this->email,
+                'password' => $this->password,
+            ]);
         }
         return $this->errors;
     }
+
 
     public function setUserCookie($user)
     {
@@ -95,25 +74,7 @@ class User
 
     public function loginUser()
     {
-        $this->validateUser('login');
-        if (empty(array_filter($this->errors))) {
-            $user = Database::$db->loginUser($this);
-            if ($user && password_verify($this->password, $user['password'])) {
-                $this->setSession();
-                header("Location: /");
-                exit();
-            } else {
-                $this->errors['credential_err'] = 'Invalid email or password.';
-            }
-        } else {
-        }
-    }
-
-    public function setSession()
-    {
-        session_start();
-        $_SESSION['username'] = $this->username;
-        $_SESSION['email'] = $this->email;
+        return Database::$db->loginUser($this);
     }
 
     public function logoutUser()

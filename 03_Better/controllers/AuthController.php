@@ -24,14 +24,17 @@ class AuthController
             $user->processData($userData);
             $errors = $user->validateUser('register');
 
-            if (!array_filter($errors)) {
+            if (empty(array_filter($errors))) {
                 $user->registerUser();
-                $user->setSession();
+                session_start();
+                $_SESSION['username'] = $user->username;
+                $_SESSION['email'] = $user->email;
                 header('Location: /');
             }
         }
         return $router->view('auth/register', ['title' => 'Register', 'user' => $userData, 'errors' => $errors]);
     }
+
 
     public function login(Router $router)
     {
@@ -39,7 +42,7 @@ class AuthController
         $userData = ['email' => '', 'password' => '', 'remember_me' => false];
 
         if (isset($_COOKIE['remember_me']) && $_COOKIE['remember_me'] == 'on') {
-            $userData['email'] = $_COOKIE['email'];
+            $userData['email'] = $_COOKIE['email'] ?? '';
             $userData['remember_me'] = true;
         } else {
             $userData['email'] = '';
@@ -53,11 +56,20 @@ class AuthController
             $user = new User();
             $user->processData($userData);
             $errors = $user->validateUser('login');
-
+            $errors['credential_err'] = '';
             $user->setUserCookie($userData);
 
-            if (!array_filter($errors)) {
-                $user->loginUser();
+            if (empty(array_filter($errors))) {
+                $userFromDb = $user->loginUser();
+                if ($userFromDb && password_verify($user->password, $userFromDb['password'])) {
+                    session_start();
+                    $_SESSION['username'] = $userFromDb['username'];
+                    $_SESSION['email'] = $user->email;
+                    header("Location: /");
+                    exit();
+                } else {
+                    $errors['credential_err'] = 'Invalid email or password.';
+                }
             }
         }
 
